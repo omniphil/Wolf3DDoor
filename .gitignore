@@ -1,0 +1,18 @@
+# Build output
+module/obj/
+module/wolf3d.wasm
+door/*.o
+door/wolf3ddoor
+door/game/
+door/native/
+door/test_out/
+__pycache__/
+
+# Things that belong to players or to id Software, not in the repository
+door/saves/
+data/
+*.WL1
+*.WL6
+*.SOD
+*.pak
+door/wolf3d.wasm

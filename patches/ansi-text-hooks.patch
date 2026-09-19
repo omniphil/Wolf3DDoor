@@ -1,0 +1,147 @@
+--- a/wl_menu.c
++++ b/wl_menu.c
+@@ -271,6 +271,16 @@
+ static int SoundStatus = 1;
+ static int pickquick;
+ static char SaveGameNames[10][MaxGameName];
++
++// [wolf3d-trace] What the BBS door's ANSI mode redraws as text. Wolfenstein's menus are pictures of text, which
++// can't be read at 80x44 half-blocks, so the door reads these and draws the menu as a text box instead
++// (door/ansi_hud.c). Nothing reads them in the TRACE module.
++CP_iteminfo *trace_menu_info;           // the menu HandleMenu is running, NULL when none
++CP_itemtype *trace_menu_items;
++volatile int trace_menu_which;          // the item the gun points at
++char trace_message[256];                // Message()'s text while its box is up, "" when none
++volatile int trace_confirm;             // Confirm() is waiting for Y or N
++char (*const trace_save_names)[MaxGameName] = SaveGameNames;
+ static char SaveName[13] = "savegam?.";
+ 
+ 
+@@ -2991,6 +3001,13 @@
+     basey = item_i->y - 2;
+     y = basey + which * 13;
+ 
++    CP_iteminfo *trace_outer_info = trace_menu_info;        // [wolf3d-trace] this menu is up; the outer one after
++    CP_itemtype *trace_outer_items = trace_menu_items;
++    trace_menu_info = item_i;
++    trace_menu_items = items;
++    trace_menu_which = which;
++    trace_message[0] = '\0';
++
+     VWB_DrawPic (x, y, C_CURSOR1PIC);
+     SetTextColor (items + which, 1);
+     if (redrawitem)
+@@ -3189,6 +3206,8 @@
+     VW_UpdateScreen ();
+ 
+     item_i->curpos = which;
++    trace_menu_info = trace_outer_info;                     // [wolf3d-trace]
++    trace_menu_items = trace_outer_items;
+ 
+     lastitem = which;
+     switch (exit)
+@@ -3250,6 +3269,7 @@
+ DrawGun (CP_iteminfo * item_i, CP_itemtype * items, int x, int *y, int which, int basey,
+          void (*routine) (int w))
+ {
++    trace_menu_which = which;                               // [wolf3d-trace]
+     VWB_Bar (x - 1, *y, 25, 16, BKGDCOLOR);
+     *y = basey + which * 13;
+     VWB_DrawPic (x, *y, C_CURSOR1PIC);
+@@ -3465,6 +3485,7 @@
+     ControlInfo ci;
+ 
+     Message (string);
++    trace_confirm = 1;                                      // [wolf3d-trace]
+     IN_ClearKeysDown ();
+     WaitKeyUp ();
+ 
+@@ -3524,6 +3545,8 @@
+ 
+     SD_PlaySound (whichsnd[xit]);
+ 
++    trace_confirm = 0;                                      // [wolf3d-trace]
++    trace_message[0] = '\0';
+     return xit;
+ }
+ 
+@@ -3593,6 +3616,7 @@
+     int h = 0, w = 0, mw = 0, i, len = (int) strlen(string);
+     fontstruct *font;
+ 
++    snprintf (trace_message, sizeof(trace_message), "%s", string);   // [wolf3d-trace]
+     fontnumber = 1;
+     font = (fontstruct *) grsegs[STARTFONT + fontnumber];
+     h = font->height;
+--- a/id_us.c
++++ b/id_us.c
+@@ -481,10 +481,30 @@
+ //		returned
+ //
+ ///////////////////////////////////////////////////////////////////////////
++// [wolf3d-trace] A name being typed (a saved game's), for the BBS door's ANSI mode to show as text
++volatile int trace_typing;
++char trace_typed[MaxString];
++
++boolean
++trace_US_LineInput(int x,int y,char *buf,const char *def,boolean escok,
++				int maxchars,int maxwidth);
++
+ boolean
+ US_LineInput(int x,int y,char *buf,const char *def,boolean escok,
+ 				int maxchars,int maxwidth)
+ {
++	boolean result;
++
++	trace_typing = 1;
++	result = trace_US_LineInput(x,y,buf,def,escok,maxchars,maxwidth);
++	trace_typing = 0;
++	return result;
++}
++
++boolean
++trace_US_LineInput(int x,int y,char *buf,const char *def,boolean escok,
++				int maxchars,int maxwidth)
++{
+ 	boolean		redraw,
+ 				cursorvis,cursormoved,
+ 				done,result, checkkey;
+@@ -719,6 +739,7 @@
+ 			USL_DrawString(olds);
+ 			fontcolor = (byte) temp;
+ 			snprintf (olds,sizeof(olds),"%s",s);
++			snprintf (trace_typed,sizeof(trace_typed),"%s",s);	// [wolf3d-trace]
+ 
+ 			px = x;
+ 			py = y;
+--- a/wl_main.c
++++ b/wl_main.c
+@@ -115,6 +115,12 @@
+ ====================
+ */
+ 
++// [wolf3d-trace] Set by the BBS door's ANSI mode before the game starts (door/ansi_host.c): it draws the status bar
++// as text, so the view takes the whole picture (21), and a text terminal plays no sound, so it starts switched off.
++// 0 = leave the player's own setting. Nothing sets them in the TRACE module.
++int trace_force_viewsize;
++int trace_force_quiet;
++
+ void ReadConfig(void)
+ {
+     byte  sd;
+@@ -235,6 +241,15 @@
+         mouseadjustment=5;
+     }
+ 
++    if (trace_force_viewsize)                   // [wolf3d-trace]
++        viewsize = trace_force_viewsize;
++    if (trace_force_quiet)
++    {
++        sm = smm_Off;
++        sd = sdm_Off;
++        sds = sds_Off;
++    }
++
+     SD_SetMusicMode (sm);
+     SD_SetSoundMode (sd);
+     SD_SetDigiDevice (sds);

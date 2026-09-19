@@ -1,0 +1,30 @@
+--- a/wl_draw.c
++++ b/wl_draw.c
+@@ -860,6 +860,12 @@
+ =====================
+ */
+ 
++// [wolf3d-trace] The fewest tics a frame may take. With the default adaptive timing a frame that takes a tic and a
++// half (a 640x400 frame in the sandbox takes ~20 ms against 14.3 ms tics) moves the view 1 tic, then 2, then 1:
++// visible judder whenever the player holds a key down. 2 = a steady 35 frames a second, every frame the same step,
++// as DOOM runs. 0 or 1 = Wolf4SDL's own timing.
++int trace_min_tics = 2;
++
+ void CalcTics (void)
+ {
+ //
+@@ -870,6 +876,14 @@
+ 
+     uint32_t curtime = SDL_GetTicks();
+     tics = (curtime * 7) / 100 - lasttimecount;
++    if (trace_min_tics > 1 && tics < trace_min_tics)            // [wolf3d-trace]
++    {
++        // wait until the frame's last tic is over, so every frame is the same step
++        int32_t until = ((lasttimecount + trace_min_tics) * 100) / 7 - (int32_t) curtime;
++        if (until > 0)
++            SDL_Delay(until);
++        tics = trace_min_tics;
++    }
+     if(!tics)
+     {
+         // wait until end of current tic

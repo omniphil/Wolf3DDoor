@@ -1,0 +1,29 @@
+--- a/wl_play.c
++++ b/wl_play.c
+@@ -255,6 +255,13 @@
+     for (i = 0; i < NUMBUTTONS; i++)
+         if (Keyboard[buttonscan[i]])
+             buttonstate[i] = true;
++
++    // [wolf3d-trace] A and D strafe, as in the BBS door's ANSI mode and most games since. The original strafes only
++    // with Alt + an arrow; these two buttons exist, but only a joystick could press them.
++    if (Keyboard[sc_A])
++        buttonstate[bt_strafeleft] = true;
++    if (Keyboard[sc_D])
++        buttonstate[bt_straferight] = true;
+ }
+ 
+ 
+@@ -312,9 +319,10 @@
+ {
+     int delta = buttonstate[bt_run] ? RUNMOVE * tics : BASEMOVE * tics;
+ 
+-    if (Keyboard[dirscan[di_north]])
++    // [wolf3d-trace] W and S move too, beside the arrows (see the strafe keys in PollKeyboardButtons)
++    if (Keyboard[dirscan[di_north]] || Keyboard[sc_W])
+         controly -= delta;
+-    if (Keyboard[dirscan[di_south]])
++    if (Keyboard[dirscan[di_south]] || Keyboard[sc_S])
+         controly += delta;
+     if (Keyboard[dirscan[di_west]])
+         controlx -= delta;

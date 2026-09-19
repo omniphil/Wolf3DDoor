@@ -1,0 +1,27 @@
+--- a/wl_def.h
++++ b/wl_def.h
+@@ -1488,18 +1488,18 @@
+ #ifndef _WIN32
+     static inline char *itoa (int value, char *string, int radix)
+     {
+-        int len = strlen(string) + 1;
+-
+-	    snprintf (string,len,"%d",value);
++        /* [wolf3d-trace] was snprintf(string, strlen(string) + 1, ...): the length of the caller's UNINITIALISED
++         * buffer. Where a fresh stack is zeroed (WebAssembly) that is 1 and every number came out empty. DOS itoa
++         * had no length either; the callers' buffers are sized for their numbers. */
++	    sprintf (string,"%d",value);
+ 
+ 	    return string;
+     }
+ 
+     static inline char *ltoa (long value, char *string, int radix)
+     {
+-        int len = strlen(string) + 1;
+-
+-	    snprintf (string,len,"%ld",value);
++        /* [wolf3d-trace] see itoa */
++	    sprintf (string,"%ld",value);
+ 
+ 	    return string;
+     }
