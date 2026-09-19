@@ -58,16 +58,3 @@ Wolf4SDL offers MAME's OPL emulator (a non-commercial licence, not GPL-compatibl
 DOSBox one no longer builds since Wolf4SDL moved from C++ to C (`id_sd.c` still calls it as a C++ class). So `id_sd.c`
 is built on its MAME path, which only *declares* `YM3812Init/Write/UpdateOne`, and `module/src/opl_trace.c` answers
 them with Nuked OPL3. No MAME code is compiled.
-
-## State (2026-09-19)
-
-- **Played on the BBS in both modes.** TRACE plays smoothly at a steady 35 fps with sound; ANSI plays in all three
-  colour modes, with menus as text and saves kept per player.
-- **Headless tests:** `door/test_door.py` (a fake TERMinator: game and data arrive intact, config before the game
-  starts, saves kept, a holed save refused, unknown names ignored) and `door/test_ansi.py` (plays ANSI and writes
-  screenshots).
-- **Sound level** matched to the other doors: gameplay with gunfire -24.6 dBFS RMS (Quake ~-25, Tyrian -24.6), menu
-  music -26.5, E1M1 music -32.1 (DOOM ~-30). Gains are `MUSIC_GAIN`/`DIGI_GAIN` in `module/src/mixer_trace.c`.
-- **ANSI held keys** are still a little choppy: a terminal only says "pressed" and waits for its repeat delay before
-  repeating, so the door has to guess (`door/INSTALL.md`, "How held keys work"). About 3% of one core per ANSI player.
-- **Not redrawn as text in ANSI yet:** "Read This!", View Scores, the tally between floors, Change View.
