@@ -36,7 +36,8 @@ static void title(void)
     door_write(CSI "1;31m"
                "        ===============================================\r\n"
                "          W O L F E N S T E I N   3 D   -   episode 1\r\n"
-               "        ===============================================\r\n" CSI "0m\r\n");
+               "        ===============================================\r\n" CSI "0m");
+    door_write(CSI "1;34m" "                    BBS door by JSONBourne\r\n" CSI "0m" "\r\n");
 }
 
 /* The name in its own colours, the way the client writes it: TERM in magenta, inator in cyan. */
@@ -355,6 +356,7 @@ static void goodbye(void)
 {
     cls();
     door_write(CSI "1;31m\r\n  Thanks for playing WOLFENSTEIN 3D.\r\n\r\n" CSI "0m");
+    door_write(CSI "1;34m" "  BBS door by JSONBourne\r\n\r\n" CSI "0m");
 
     /* The game here is Wolf4SDL (id's GPL source release) with the Nuked OPL3 chip: players are entitled to its
      * source */
