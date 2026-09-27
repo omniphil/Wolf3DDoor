@@ -9,7 +9,9 @@
  *
  * The loop reads keys, lets go of keys whose time is up, and sends a frame when there is a new one and the link has
  * room for it. If the link is slow, frames are skipped rather than queued, so the picture never falls behind the
- * game: a slow connection gets fewer frames, not old ones.
+ * game: a slow connection gets fewer frames, not old ones. Room is judged by the caller's terminal answering each
+ * frame as it arrives (ansi_pace.c): only this machine's output queue can be seen from here, and frames piled up past
+ * it, in the BBS and the network, arrived late and in bursts.
  */
 
 #define _POSIX_C_SOURCE 200809L
@@ -26,6 +28,7 @@
 #include "ansi_host.h"
 #include "ansi_hud.h"
 #include "ansi_input.h"
+#include "ansi_pace.h"
 #include "ansi_play.h"
 #include "door.h"
 #include "trace_wolf.h"
@@ -225,6 +228,7 @@ play_result_t ansi_play(ansi_mode_t mode, bool utf8)
         return PLAY_FAILED;
     }
 
+    ansi_pace_reset();
     stats_since = now_ms();
     for (;;)
     {
@@ -239,7 +243,7 @@ play_result_t ansi_play(ansi_mode_t mode, bool utf8)
             FD_SET(STDIN_FILENO, &fds);
             if (select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv) > 0)
             {
-                unsigned char buf[256];
+                unsigned char buf[256], keys[256 + ANSI_PACE_HELD];
                 ssize_t n = read(STDIN_FILENO, buf, sizeof(buf));
                 if (n == 0 || (n < 0 && errno != EINTR && errno != EAGAIN))
                 {
@@ -247,10 +251,19 @@ play_result_t ansi_play(ansi_mode_t mode, bool utf8)
                     break;
                 }
                 if (n > 0)
-                    ansi_input_feed(buf, (int)n, now_ms());
+                {
+                    long at = now_ms();
+                    ansi_input_feed(keys, ansi_pace_take(buf, (int)n, keys, at), at);
+                }
             }
         }
         now = now_ms();
+        {
+            unsigned char held[ANSI_PACE_HELD];
+            int n = ansi_pace_stale(held, now);
+            if (n > 0)
+                ansi_input_feed(held, n, now);
+        }
 
         ansi_hud_read(&hud);
         ansi_input_auto_fire(hud.weapon >= 2);
@@ -281,7 +294,7 @@ play_result_t ansi_play(ansi_mode_t mode, bool utf8)
         }
 
         /* A frame, when there's a new one, it's time, and the link has caught up */
-        if (now - last_sent >= 1000 / MAX_FPS && output_queued() < OUTQ_LIMIT)
+        if (now - last_sent >= 1000 / MAX_FPS && output_queued() < OUTQ_LIMIT && ansi_pace_open(now))
         {
             const char *out;
             size_t len;
@@ -295,11 +308,12 @@ play_result_t ansi_play(ansi_mode_t mode, bool utf8)
             len = ansi_screen_update(&out);
             if (len > 0)
             {
-                if (!write_all(out, len))
+                if (!write_all(out, len) || !write_all(ANSI_PACE_QUESTION, sizeof(ANSI_PACE_QUESTION) - 1))
                 {
                     result = PLAY_HANGUP;
                     break;
                 }
+                ansi_pace_sent(now, len + sizeof(ANSI_PACE_QUESTION) - 1);
                 frames++;
                 bytes += (long)len;
             }
@@ -310,8 +324,8 @@ play_result_t ansi_play(ansi_mode_t mode, bool utf8)
         if (now - stats_since >= 1000)
         {
             if (show_stats)
-                snprintf(stats, sizeof(stats), "%ld fps %ld KB/s", frames * 1000 / (now - stats_since),
-                         bytes * 1000 / (now - stats_since) / 1024);
+                snprintf(stats, sizeof(stats), "%ld fps %ld KB/s %ld ms", frames * 1000 / (now - stats_since),
+                         bytes * 1000 / (now - stats_since) / 1024, ansi_pace_rtt());
             frames = bytes = 0;
             stats_since = now;
         }

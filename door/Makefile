@@ -33,7 +33,7 @@ GAME ?= game
 WOLF4SDL = $(GAME)/wolf4sdl
 PATCHES  = $(wildcard $(PATCH_DIR)/*.patch)
 
-DOOR_OBJ = main.o door.o trace_wolf.o trace_door.o files.o sha256.o ansi_host.o ansi_screen.o ansi_input.o ansi_play.o \
+DOOR_OBJ = main.o door.o trace_wolf.o trace_door.o files.o sha256.o ansi_host.o ansi_screen.o ansi_input.o ansi_pace.o ansi_play.o \
            apc.o jxl_enc.o pix_play.o pix_sound.o
 
 # ---- the game, compiled for this machine ----
