@@ -1,16 +1,19 @@
 # Installing the WOLFENSTEIN 3D door on the BBS
 
-Two ways to play, picked by each caller on the start page (remembered in their `saves/<player>/display.cfg`):
+Three ways to play, picked by each caller on the start page (remembered in their `saves/<player>/display.cfg`; a choice
+saved before the JPEG XL mode came in is moved up to the same mode's new number):
 
 | Choice | What it is |
 |---|---|
 | 1. TRACE graphics (640x400 + Sound) | the door sends the game and TERMinator runs it on the caller's machine. Only offered to TERMinator with TRACE |
-| 2. ANSI 24-bit | the game runs here and is sent as half-blocks in exact colour |
-| 3. ANSI 256 | the same in xterm's 256 colours |
-| 4. ANSI 16 | CP437 blocks and shades. Works in any BBS terminal |
+| 2. JPEG XL graphics (320x200 + Sound) | the game runs here; its real picture goes as JPEG XL and its sound plays from the terminal's cache (below) |
+| 3. ANSI 24-bit | the game runs here and is sent as half-blocks in exact colour |
+| 4. ANSI 256 | the same in xterm's 256 colours |
+| 5. ANSI 16 | CP437 blocks and shades. Works in any BBS terminal |
 
-This is the DOOM door's design (`../../Doom/door/INSTALL.md` has the ANSI details: detection, test strips, U for
-UTF-8 blocks, link pacing).
+This is the DOOM door's design (`../../Doom/door/INSTALL.md` has the details: detection, test strips, U for UTF-8
+blocks, link pacing, and the JPEG XL mode's pacing and quality). The start page is the first thing a caller sees: the
+menu shows what was detected.
 
 ## What the BBS needs
 
@@ -21,7 +24,9 @@ A Linux BBS box with `gcc`, `make`, `patch` and `python3`, and BBS software that
 | `wolf3ddoor` | built here with `make` (the game is compiled in, for ANSI mode) | ~430 KB |
 | `wolf3d.wasm` | ships in this folder (or `make` in `../module`, which needs wasi-sdk) | ~325 KB |
 | `wolf3d.pak` | the shareware data, packed by `make install` from `../data` | 1.2 MB |
+| `sound/` | the JPEG XL mode's sound, rendered from the game's data (below). Copied with the folder | 5.8 MB |
 | `native/` | the game's sources, put here by `make bundle` on the development machine | |
+| libjxl | the system's `libjxl.so` (0.7 or later), loaded at run time; without it the JPEG XL mode isn't offered | |
 
 ## Steps
 
@@ -36,11 +41,41 @@ A Linux BBS box with `gcc`, `make`, `patch` and `python3`, and BBS software that
 ```
 python3 test_door.py            # a fake TERMinator: game and data arrive intact, config first, saves kept
 python3 test_door.py --plain    # no TRACE: it is marked NOT FOUND and the ANSI modes are offered
-python3 test_ansi.py 2 out/     # plays ANSI 24-bit headless and writes screenshots to out/ (3 = 256, 4 = 16)
+python3 test_ansi.py 3 out/     # plays ANSI 24-bit headless and writes screenshots to out/ (4 = 256, 5 = 16)
 rm -rf saves out                # the tests leave these behind
 ```
 
-`WOLFDOOR_LOG=/some/file ./wolf3ddoor` writes the game's own messages there in ANSI mode.
+`WOLFDOOR_LOG=/some/file ./wolf3ddoor` writes the game's own messages there, and in the JPEG XL mode its numbers
+(frames a second, KB a second, quality, round trip) every 5 seconds. Without it a JPEG XL game keeps them in
+`saves/<player>/jxl.log` (the last game only). A `saves/<player>/linktest.cfg` (`kbps=300`, `ping=80`) plays that
+player's JPEG XL games through a link of that speed, for seeing how it does over the internet.
+
+## JPEG XL mode (added 2026-09-27)
+
+The DOOM door's JPEG XL mode (`../../Doom/door/INSTALL.md`, "JPEG XL mode") for Wolfenstein: offered to a terminal that
+answers as CTerm and draws JPEG XL (`Q;JXL`), with sound if it also plays Ogg Vorbis and WAV files. The game runs here
+with the player's own settings (TRACE's `config.wl1`: its status bar, view size and sound), each frame goes as a
+320x200 JPEG XL the terminal scales up, at most 30 a second, sharper or softer to suit the link. Measured on a
+modelled link: 30 fps at distance 0.5 on 1-2 MB/s, 26-27 fps at distance ~3 on 300 KB/s with a 120 ms ping.
+
+Keys: a terminal that reports presses and releases (`CSI = 1 h`) gets the game's own keys, Shift to run, and F as well
+as Ctrl fires; one that doesn't gets the ANSI mode's keys (above), R to run.
+
+**Sound** plays on the caller's terminal from files in its cache, so almost nothing is streamed: the digitised sounds
+(WAV, upsampled to 22 kHz as the game does) and every AdLib effect go up once, about 1.7 MB, checked by md5 on each call; music is
+each track cut into 5-second Ogg Vorbis pieces, sent just before they're needed (or earlier while the link is idle).
+The game's own sound code runs as in ANSI mode, and its calls are caught on the way (`pix_hooks.c`, linked with
+`--wrap`), so its timing is untouched. Levels match TRACE (the mixer's gains, `module/src/mixer_trace.c`).
+
+`sound/` is made on the development machine from `../data` (it's derived from id's data, so it ships with the door but
+isn't in the public source):
+
+```
+make wolfrender && ./wolfrender ../data /tmp/wolfsound && python3 tools/make_sound.py /tmp/wolfsound sound
+```
+
+`wolfrender` drives the Nuked OPL3 chip the way the game does (music at 700 Hz, effects every fifth tick). The
+shareware data has placeholder chunks for the 16 songs only the full game has; they are skipped (11 tracks remain).
 
 ## Saved games
 

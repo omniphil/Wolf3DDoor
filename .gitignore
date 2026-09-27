@@ -16,3 +16,7 @@ data/
 *.SOD
 *.pak
 door/wolf3d.wasm
+
+# The JPEG XL mode's sound, rendered from id's data (door/INSTALL.md): ships with the door, not in the source
+door/sound/
+door/wolfrender

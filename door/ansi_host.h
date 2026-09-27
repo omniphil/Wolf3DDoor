@@ -9,6 +9,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/* The JPEG XL mode (pix_play.c): the game's own view, status bar and sound instead of ANSI mode's, and keys held as
+ * TRACE holds them when the terminal reports presses and releases (keys). Call before ansi_host_start. */
+void ansi_host_set_pixel_mode(bool on, bool keys);
+
 /* Starts the game on its own thread, with the data the door loaded and this player's saves. */
 bool ansi_host_start(const unsigned char *pak, size_t pak_size, const char *pak_hash);
 

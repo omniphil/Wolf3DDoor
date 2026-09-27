@@ -3,7 +3,7 @@
 Plays the door's ANSI mode headless: runs wolf3ddoor on a pseudo-terminal as a caller without TRACE would see it,
 types a script of keys, and renders the screen to PNGs so it can be looked at without a BBS or a terminal.
 
-    python3 test_ansi.py [mode] [outdir]      mode: 2 = 24-bit (default), 3 = 256, 4 = 16 colours
+    python3 test_ansi.py [mode] [outdir]      mode: 3 = 24-bit (default), 4 = 256, 5 = 16 colours
 
 The renderer understands only what the door sends: cursor moves, SGR colours (16, 256, 24-bit), CP437 blocks and
 shades, and plain text. Keys are timed from the moment the game starts.
@@ -92,7 +92,7 @@ class Screen:
                     self.pending = data[i:]
                     return
                 if data[i + 1] == ord('['):
-                    m = re.match(rb'\x1b\[([?=]?)([0-9;]*)([@-~])', data[i:])
+                    m = re.match(rb'\x1b\[([?=<>]?)([0-9;]*)([@-~])', data[i:])
                     if not m:
                         self.pending = data[i:]
                         return
@@ -162,7 +162,7 @@ KEYS = {'up': b'\x1b[A', 'down': b'\x1b[B', 'right': b'\x1b[C', 'left': b'\x1b[D
 
 
 def main():
-    mode = sys.argv[1] if len(sys.argv) > 1 else '2'
+    mode = sys.argv[1] if len(sys.argv) > 1 else '3'
     out = sys.argv[2] if len(sys.argv) > 2 else os.path.join(HERE, 'test_out')
     os.makedirs(out, exist_ok=True)
 

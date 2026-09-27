@@ -11,8 +11,9 @@
  *   assets          the game data the door has already loaded
  *   send            pieces of the player's files, kept by the door's files.c as if they had come over TRACE
  *   sound           mixed and thrown away at the real rate. The game keeps its sound timing in the mixer (a sound
- *                   "ends" when the AdLib player reaches its end), so the mixer has to keep running; the door also
- *                   starts the game with sound switched off, so it is mostly silence and costs little
+ *                   "ends" when the AdLib player reaches its end), so the mixer has to keep running; ANSI mode starts
+ *                   the game with sound switched off, so it is mostly silence and costs little. The JPEG XL mode
+ *                   leaves it on, and plays the same sounds on the caller's terminal instead (pix_hooks.c)
  *   quit            ends the game thread; the door notices and shows its closing screen
  */
 
@@ -52,6 +53,9 @@ static uint32_t       *g_frame;
 static int             g_frame_w, g_frame_h;
 static size_t          g_frame_cap;
 static unsigned        g_frame_seq;
+
+static bool            g_pixel_mode, g_pixel_keys;
+static int             g_default_hold = -1;  /* the module's own wolftrace_min_hold_ms */
 
 static atomic_int      g_finished;
 static struct timespec g_start;
@@ -171,6 +175,12 @@ int32_t trace_store_write(const void *data, int32_t length) { (void)data; (void)
 
 /* ---- the door's side ---- */
 
+void ansi_host_set_pixel_mode(bool on, bool keys)
+{
+    g_pixel_mode = on;
+    g_pixel_keys = keys;
+}
+
 /* A message for the module: its text line, then the payload after a newline, exactly as TRACE would deliver it. */
 static void native_send(const char *head, const void *payload, size_t len)
 {
@@ -203,16 +213,31 @@ bool ansi_host_start(const unsigned char *pak, size_t pak_size, const char *pak_
     g_pak_size = pak_size;
     snprintf(g_pak_hash, sizeof(g_pak_hash), "%s", pak_hash);
 
-    /* The door draws the status bar as text and can't play sound (see the patch's notes in wl_main.c) */
-    trace_force_viewsize = 21;
-    trace_force_quiet = 1;
-    wolftrace_min_hold_ms = 0;
+    if (g_default_hold < 0)
+        g_default_hold = wolftrace_min_hold_ms;
+    if (g_pixel_mode)
+    {
+        /* JPEG XL: the game's own picture, status bar and sound, as the player has them set (TRACE's config). Keys
+         * the terminal reports as presses and releases are held as TRACE holds them; without those, ansi_input.c
+         * paces the presses itself, as in ANSI mode. */
+        trace_force_viewsize = 0;
+        trace_force_quiet = 0;
+        wolftrace_min_hold_ms = g_pixel_keys ? g_default_hold : 0;
+    }
+    else
+    {
+        /* ANSI: the door draws the status bar as text and can't play sound (see the patch's notes in wl_main.c) */
+        trace_force_viewsize = 21;
+        trace_force_quiet = 1;
+        wolftrace_min_hold_ms = 0;
+    }
 
     if (trace_init() != 0)
         return false;
 
     /* The same messages the door sends over TRACE: the player's files first, then the data, which starts the game.
-     * 320x200 is already more than 80x44 half-blocks can show, and a quarter of the work of 640x400. */
+     * 320x200 is already more than 80x44 half-blocks can show, a quarter of the work of 640x400, and the JPEG XL
+     * mode's own size. */
     files_send_all(native_send);
     snprintf(start, sizeof(start), "pak=%s res=320x200", g_pak_hash);
     trace_on_data(start, (int32_t)strlen(start));

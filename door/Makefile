@@ -1,10 +1,18 @@
 # The WOLFENSTEIN 3-D door. For TERMinator it sends wolf3d.wasm and wolf3d.pak, which run on the player's own machine
-# (see ../module). For every other terminal it runs the same game itself and sends it as ANSI (ansi_*.c), so the
-# game's sources are built in here too. Built for the BBS box; the same C builds anywhere POSIX. (The DOOM door's
-# Makefile, for Wolfenstein.)
+# (see ../module). For every other terminal it runs the same game itself and sends it as JPEG XL pictures with sound
+# (pix_*.c) or as ANSI (ansi_*.c), so the game's sources are built in here too. Built for the BBS box; the same C
+# builds anywhere POSIX. libjxl is loaded at run time (jxl_enc.c), so only its headers are needed, and they're here.
+# (The DOOM door's Makefile, for Wolfenstein.)
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c11 -O2
-LDFLAGS = -pthread -lm
+LDFLAGS = -pthread -lm -ldl
+
+# The game's sound calls go through pix_hooks.c first, for the JPEG XL mode (which plays the sound on the caller's
+# terminal): id_sd.c's, as the game calls them, and the mixer's, as id_sd.c calls them
+WRAP = SD_PrepareSound SD_PlaySound SD_StopSound SD_SetSoundMode \
+       SD_StartMusic SD_ContinueMusic SD_MusicOff SD_FadeOutMusic SD_SetMusicMode \
+       Mix_LoadWAV_RW Mix_PlayChannel Mix_HaltChannel Mix_SetPanning
+WRAP_FLAGS = $(foreach f, $(WRAP), -Wl,--wrap=$(f))
 
 # No built-in rules: with the patched-copy rule below they would chain into nonsense
 MAKEFLAGS += -r
@@ -25,7 +33,8 @@ GAME ?= game
 WOLF4SDL = $(GAME)/wolf4sdl
 PATCHES  = $(wildcard $(PATCH_DIR)/*.patch)
 
-DOOR_OBJ = main.o door.o trace_wolf.o trace_door.o files.o sha256.o ansi_host.o ansi_screen.o ansi_input.o ansi_play.o
+DOOR_OBJ = main.o door.o trace_wolf.o trace_door.o files.o sha256.o ansi_host.o ansi_screen.o ansi_input.o ansi_play.o \
+           apc.o jxl_enc.o pix_play.o pix_sound.o
 
 # ---- the game, compiled for this machine ----
 # The same files and flags ../module/Makefile builds into wolf3d.wasm, only for a normal CPU rather than wasm32
@@ -38,10 +47,10 @@ WOLF_SRC = id_ca.c id_in.c id_pm.c id_sd.c id_us.c id_vh.c id_vl.c signon.c \
            wl_main.c wl_menu.c wl_parallax.c wl_plane.c wl_play.c wl_scale.c wl_shade.c wl_state.c wl_text.c \
            wl_utils.c
 TRACE_SRC = wolftrace.c sdl_trace.c mixer_trace.c file_trace.c opl_trace.c
-GAME_OBJ  = $(patsubst %.c, $(GAME)/%.o, $(WOLF_SRC) $(TRACE_SRC) opl3.c ansi_hud.c)
+GAME_OBJ  = $(patsubst %.c, $(GAME)/%.o, $(WOLF_SRC) $(TRACE_SRC) opl3.c ansi_hud.c pix_hooks.c)
 
 wolf3ddoor: $(DOOR_OBJ) $(GAME_OBJ)
-	$(CC) $(DOOR_OBJ) $(GAME_OBJ) -o $@ $(LDFLAGS)
+	$(CC) $(DOOR_OBJ) $(GAME_OBJ) -o $@ $(LDFLAGS) $(WRAP_FLAGS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -59,9 +68,20 @@ $(GAME)/%.o: $(MODULE)/src/%.c $(WOLF4SDL)/.patched | $(GAME)
 $(GAME)/opl3.o: $(NUKED)/opl3.c | $(GAME)
 	$(CC) $(GAME_CFLAGS) -c $< -o $@
 
-# Reads the game's state, so it is built with the game's headers and flags
+jxl_enc.o: jxl_enc.c
+	$(CC) $(CFLAGS) -I jxl_include -c $< -o $@
+
+# Read the game's state, so they are built with the game's headers and flags
 $(GAME)/ansi_hud.o: ansi_hud.c $(WOLF4SDL)/.patched | $(GAME)
 	$(CC) $(GAME_CFLAGS) -I . -c $< -o $@
+
+$(GAME)/pix_hooks.o: pix_hooks.c $(WOLF4SDL)/.patched | $(GAME)
+	$(CC) $(GAME_CFLAGS) -I . -c $< -o $@
+
+# Renders the game's sound for the JPEG XL mode (tools/wolfrender.c, then tools/make_sound.py). Development only: the
+# results are in sound/, so the BBS never builds this.
+wolfrender: tools/wolfrender.c $(NUKED)/opl3.c
+	$(CC) -O2 -Wall -I $(NUKED) $^ -o $@
 
 # Wolf4SDL's main() runs on the game thread (the module's wolftrace.c), under another name
 $(GAME)/wl_main.o: $(WOLF4SDL)/wl_main.c | $(GAME)
@@ -109,6 +129,6 @@ bundle:
 	@du -sh native
 
 clean:
-	rm -rf $(DOOR_OBJ) $(GAME) wolf3ddoor
+	rm -rf $(DOOR_OBJ) $(GAME) wolf3ddoor wolfrender
 
 .PHONY: clean install bundle

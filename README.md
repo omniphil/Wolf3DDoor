@@ -5,6 +5,11 @@ works the same way as the DOOM door (https://github.com/omniphil/DOOMDoor):
 
 - **TRACE** (TERMinator 1.1.2+): the whole game runs on the caller's PC inside TERMinator's sandbox at 640x400, with
   AdLib music and digitised sound. The BBS sends it once; after that almost nothing crosses the wire.
+- **JPEG XL graphics** (terminals that speak the CTerm APC picture and sound commands): the door runs the game on the
+  BBS and sends its real 320x200 picture as JPEG XL, up to 30 frames a second at a quality that follows the link,
+  with its AdLib music, AdLib effects and digitised sound played from the caller's own cache (`door/pix_*.c`, and
+  `door/INSTALL.md` "JPEG XL mode"). The sound is rendered ahead of time from the game's data by
+  `door/tools/wolfrender.c` and `door/tools/make_sound.py`; like the data, what they make isn't in the repository.
 - **ANSI 24-bit / 256 / 16** (every other terminal): the door runs the same game on the BBS and sends it as ANSI
   half-blocks. The menus are redrawn as text boxes and the status bar as a text line, because Wolfenstein's own are
   pictures of text that can't be read at 80x44. It is silent.
@@ -18,7 +23,7 @@ address the door itself gives out.
 | Folder | What |
 |---|---|
 | `third_party/Wolf4SDL` | Wolf4SDL (github.com/KS-Presto/Wolf4SDL, commit dc8b250, 2024-05-20), unmodified. id's code under the GPL (license-gpl.txt) |
-| `third_party/nuked-opl3` | Nuked OPL3 1.8 (GPL-2+), the AdLib chip, copied unmodified from Crispy Doom 7.1 |
+| `third_party/nuked-opl3` | Nuked OPL3 1.8 (GPL-2+), the AdLib chip, copied unmodified from Crispy Doom 7.1. Its output goes through a model of the AdLib card's output stage (`module/src/mixer_trace.c`, `door/tools/wolfrender.c`) |
 | `patches/` | every change made to Wolf4SDL, applied to a copy at build time (see below) |
 | `data/` | the shareware v1.4 data (`*.WL1`, 8 files). **Not in the repository** (id's, not GPL): `tools/get_shareware.sh` fetches it from archive.org item `wolf3dsw` (`wolf3dsw.zip`, md5 44729c473432d11b9194f52c648ea19d) |
 | `module/` | `wolf3d.wasm`, the game as a TRACE module (see `module/README.md`) |

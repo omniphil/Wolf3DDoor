@@ -11,6 +11,7 @@
  * running while the game waits for a sound to end.
  */
 
+#include <math.h>
 #include <string.h>
 
 #include "SDL_mixer.h"
@@ -33,6 +34,17 @@
 #define MUSIC_GAIN  2.5f        /* AdLib: music and the AdLib sound effects */
 #define DIGI_GAIN   0.35f       /* digitised sounds (guns, voices, doors) */
 
+/*
+ * The AdLib card's output stage (2026-09-27). The emulated chip's raw output is harsh where a real card's wasn't: some
+ * effects use a waveform that rises and then drops straight to zero (a click every cycle: the "nothing to use" grunt
+ * crackled), and all of it sits on one side of zero (a thump as a sound starts and stops). A card's output blocked the
+ * offset and rounded off the edges, so the chip's sound goes through the same here: a 20 Hz high-pass and two 7 kHz
+ * one-pole low-passes, chosen by ear. The BBS door's JPEG XL mode renders its AdLib sound the same way
+ * (door/tools/wolfrender.c card_output).
+ */
+#define CARD_DC_HZ    20.0f
+#define CARD_SOFT_HZ  7000.0f
+
 typedef struct
 {
     Mix_Chunk *chunk;
@@ -44,6 +56,27 @@ typedef struct
 } channel_t;
 
 static channel_t g_channels[MIX_CHANNELS];
+
+/* card_output's state, left and right */
+static float g_card_r, g_card_a;
+static float g_card_px[2], g_card_hp[2], g_card_l1[2], g_card_l2[2];
+
+/* The chip's samples through the card's output stage */
+static float card_output(Sint16 x, int side)
+{
+    float y;
+    if (g_card_r == 0.0f)
+    {
+        g_card_r = expf(-2.0f * 3.14159265f * CARD_DC_HZ / RATE);
+        g_card_a = expf(-2.0f * 3.14159265f * CARD_SOFT_HZ / RATE);
+    }
+    y = (float)x - g_card_px[side] + g_card_r * g_card_hp[side];
+    g_card_px[side] = (float)x;
+    g_card_hp[side] = y;
+    g_card_l1[side] = (1.0f - g_card_a) * y + g_card_a * g_card_l1[side];
+    g_card_l2[side] = (1.0f - g_card_a) * g_card_l1[side] + g_card_a * g_card_l2[side];
+    return g_card_l2[side];
+}
 static int       g_reserved;
 static Uint32    g_play_count;
 static int       g_open;
@@ -243,7 +276,7 @@ static void mix_block(Sint16 *out, int frames)
         g_music(g_music_arg, (Uint8 *)out, frames * 4);
 
     for (int i = 0; i < frames * 2; i++)
-        acc[i] = (int)(out[i] * MUSIC_GAIN);
+        acc[i] = (int)(card_output(out[i], i & 1) * MUSIC_GAIN);
     for (int c = 0; c < MIX_CHANNELS; c++)
     {
         channel_t *ch = &g_channels[c];

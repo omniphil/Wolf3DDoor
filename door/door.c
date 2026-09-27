@@ -46,6 +46,9 @@ static void set_raw_mode(void) {
         atexit(restore_terminal);
         raw = orig_termios;
         raw.c_lflag &= ~(ECHO | ICANON);
+        /* No XON/XOFF: on a pseudo-terminal Ctrl-Q and Ctrl-S would otherwise never reach the door (Ctrl-Q is the
+         * games' quit key) and a stray Ctrl-S would freeze everything it sends */
+        raw.c_iflag &= ~(IXON | IXOFF);
         raw.c_cc[VMIN] = 0;
         raw.c_cc[VTIME] = 1;
         tcsetattr(STDIN_FILENO, TCSANOW, &raw);
