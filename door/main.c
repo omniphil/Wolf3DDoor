@@ -303,7 +303,7 @@ static void draw_menu(const terminal_t *term, int recommended, bool utf8)
     door_write(CSI "0;37m  Choose how to play:\r\n\r\n");
 
     if (term->trace)
-        door_write(CSI "1;37m  [1] " CSI "1;35mTRACE" CSI "1;37m graphics   " CSI "0;37m(640x400 + Sound)      "
+        door_write(CSI "1;37m  [1] " CSI "1;32mTRACE" CSI "1;37m graphics   " CSI "0;37m(640x400 + Sound)      "
                    CSI "1;32mDETECTED\r\n");
     else
         door_write(CSI "1;30m  [1] TRACE graphics   (640x400 + Sound)      NOT FOUND (needs " CSI "1;35mTERM"
