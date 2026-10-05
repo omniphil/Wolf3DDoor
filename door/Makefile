@@ -78,10 +78,21 @@ $(GAME)/ansi_hud.o: ansi_hud.c $(WOLF4SDL)/.patched | $(GAME)
 $(GAME)/pix_hooks.o: pix_hooks.c $(WOLF4SDL)/.patched | $(GAME)
 	$(CC) $(GAME_CFLAGS) -I . -c $< -o $@
 
-# Renders the game's sound for the JPEG XL mode (tools/wolfrender.c, then tools/make_sound.py). Development only: the
-# results are in sound/, so the BBS never builds this.
+# Renders the game's sound for the JPEG XL mode into sound/ (tools/wolfrender.c, then tools/make_sound.py). sound/ is
+# made from id's data, so it isn't in the public source: a build from GitHub runs this once. Needs the data
+# (../tools/get_shareware.sh, or DATA=<folder with the .WL1 files>) and ffmpeg with libvorbis.
+DATA      ?= ../data
+SOUND_TMP ?= /tmp/wolfsound
+
 wolfrender: tools/wolfrender.c $(NUKED)/opl3.c
 	$(CC) -O2 -Wall -I $(NUKED) $^ -o $@ -lm
+
+sound: wolfrender
+	@[ -f $(DATA)/AUDIOT.WL1 ] || { echo "make sound: no game data in $(DATA) -- run tools/get_shareware.sh in the top folder, or give DATA=<folder with the .WL1 files>"; exit 1; }
+	@command -v ffmpeg > /dev/null || { echo "make sound: needs ffmpeg with libvorbis (Debian, Ubuntu, Mint, Raspberry Pi OS: sudo apt install ffmpeg)"; exit 1; }
+	@ffmpeg -hide_banner -encoders 2> /dev/null | grep -q libvorbis || { echo "make sound: this ffmpeg has no libvorbis encoder"; exit 1; }
+	./wolfrender $(DATA) $(SOUND_TMP)
+	python3 tools/make_sound.py $(SOUND_TMP) sound
 
 # Wolf4SDL's main() runs on the game thread (the module's wolftrace.c), under another name
 $(GAME)/wl_main.o: $(WOLF4SDL)/wl_main.c | $(GAME)
@@ -125,10 +136,11 @@ bundle:
 	      native/Wolf4SDL/
 	cp ../third_party/nuked-opl3/opl3.c ../third_party/nuked-opl3/opl3.h native/nuked-opl3/
 	cp ../patches/*.patch native/patches/
-	cp ../../../TERMinator-Windows/trace/include/trace_api.h native/trace/
+	cp $(TRACE_INCLUDE)/trace_api.h native/trace/
 	@du -sh native
+	@[ -f sound/index.txt ] || echo "note: no sound/ yet -- run 'make sound' first, or the JPEG XL mode has no sound"
 
 clean:
 	rm -rf $(DOOR_OBJ) $(GAME) wolf3ddoor wolfrender
 
-.PHONY: clean install bundle
+.PHONY: clean install bundle sound

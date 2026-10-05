@@ -24,13 +24,14 @@ A Linux BBS box with `gcc`, `make`, `patch` and `python3`, and BBS software that
 | `wolf3ddoor` | built here with `make` (the game is compiled in, for ANSI mode) | ~430 KB |
 | `wolf3d.wasm` | ships in this folder (or `make` in `../module`, which needs wasi-sdk) | ~325 KB |
 | `wolf3d.pak` | the shareware data, packed by `make install` from `../data` | 1.2 MB |
-| `sound/` | the JPEG XL mode's sound, rendered from the game's data (below). Copied with the folder | 5.8 MB |
+| `sound/` | the JPEG XL mode's sound, rendered from the game's data by `make sound` (below). Copied with the folder | 5.8 MB |
 | `native/` | the game's sources, put here by `make bundle` on the development machine | |
 | libjxl | the system's `libjxl.so` (0.7 or later), loaded at run time; without it the JPEG XL mode isn't offered | |
 
 ## Steps
 
-1. On the development machine: `make bundle` in `door/`, so the folder builds on its own.
+1. On the development machine: `make sound` (once) and `make bundle` in `door/`, so the folder builds on its own and
+   has its sound.
 2. Copy `door/` to the BBS and run `make && make install` there.
 3. **Add a door entry** that runs `wolf3ddoor` with the folder holding `door32.sys` as its one argument. In Mystic:
    `(D3) Exec DOOR32 program` with Data `./doors/wolf3d/wolf3ddoor /path/to/mystic/temp%3`. Without a drop file every
@@ -67,12 +68,16 @@ each track cut into 5-second Ogg Vorbis pieces, sent just before they're needed 
 The game's own sound code runs as in ANSI mode, and its calls are caught on the way (`pix_hooks.c`, linked with
 `--wrap`), so its timing is untouched. Levels match TRACE (the mixer's gains, `module/src/mixer_trace.c`).
 
-`sound/` is made on the development machine from `../data` (it's derived from id's data, so it ships with the door but
-isn't in the public source):
+`sound/` is made from `../data` (it's derived from id's data, so it ships with the door but isn't in the public source;
+a build from GitHub makes it once). It needs ffmpeg with libvorbis (`sudo apt install ffmpeg` on Debian, Ubuntu, Mint
+or Raspberry Pi OS):
 
 ```
-make wolfrender && mkdir -p /tmp/wolfsound && ./wolfrender ../data /tmp/wolfsound && python3 tools/make_sound.py /tmp/wolfsound sound
+make sound                          # or: make sound DATA=/path/to/the/WL1/files
 ```
+
+That builds `wolfrender`, renders every sound into `/tmp/wolfsound` (`SOUND_TMP=` to change it), and converts them
+into `sound/` with `tools/make_sound.py`.
 
 `wolfrender` drives the Nuked OPL3 chip the way the game does (music at 700 Hz, effects every fifth tick). The
 shareware data has placeholder chunks for the 16 songs only the full game has; they are skipped (11 tracks remain).

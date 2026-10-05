@@ -36,8 +36,13 @@ Build (Linux or WSL; the module needs [wasi-sdk](https://github.com/WebAssembly/
 ```
 sh tools/get_shareware.sh                  # the shareware data, into data/
 make -C module && cp module/wolf3d.wasm door/ && python3 tools/mkpak.py data door/wolf3d.pak && make -C door
+make -C door sound       # the JPEG XL mode's sound, into door/sound/ (needs ffmpeg with libvorbis)
 make -C door bundle      # before copying door/ to the BBS: puts the game's sources in door/native/
 ```
+
+`make -C door sound` is needed once: `door/sound/` is made from id's data, so it isn't in the repository. Without it
+the JPEG XL mode plays with no sound (TRACE and ANSI don't use it). On Debian, Ubuntu, Mint or Raspberry Pi OS,
+`sudo apt install ffmpeg` gives an ffmpeg with libvorbis.
 
 ## The patches
 

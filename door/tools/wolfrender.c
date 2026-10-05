@@ -1,10 +1,10 @@
 /*
  * wolfrender.c -- renders Wolfenstein's sound for the JPEG XL graphics mode, which plays it on the caller's own
- * terminal from files in its cache (pix_sound.c). Development only: the results are in door/sound/.
+ * terminal from files in its cache (pix_sound.c). `make sound` runs it, then tools/make_sound.py, to fill door/sound/:
  *
- *     make wolfrender && ./wolfrender ../data /tmp/wolfsound && python3 tools/make_sound.py /tmp/wolfsound sound
+ *     ./wolfrender ../data /tmp/wolfsound && python3 tools/make_sound.py /tmp/wolfsound sound
  *
- * Writes into the output folder:
+ * Writes into the output folder (made if it isn't there):
  *   digi_NN.wav    each digitised sound (guns, voices, doors), 16-bit mono at 22050 Hz: VSWAP's 8-bit 7042 Hz samples
  *                  upsampled the way the game does it (id_sd.c GetSample, cubic). Sent as they are, the terminal
  *                  stretched them 6x with straight lines, which left them scratchy; the originals hold nothing
@@ -31,12 +31,14 @@
  */
 
 #define _USE_MATH_DEFINES
+#include <errno.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "opl3.h"
 
@@ -80,7 +82,7 @@ static uint8_t *load(const char *dir, const char *name, size_t *size)
     f = fopen(path, "rb");
     if (f == NULL)
     {
-        fprintf(stderr, "%s: can't open\n", path);
+        fprintf(stderr, "%s: can't open: %s\n", path, strerror(errno));
         exit(1);
     }
     fseek(f, 0, SEEK_END);
@@ -141,7 +143,7 @@ static void write_wav(const char *path, const void *data, uint32_t bytes, uint32
 
     if (f == NULL)
     {
-        fprintf(stderr, "%s: can't write\n", path);
+        fprintf(stderr, "%s: can't write: %s\n", path, strerror(errno));
         exit(1);
     }
     memcpy(h, "RIFF", 4);
@@ -469,11 +471,17 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    /* the folder itself, not its parents: a mistyped path (/temp for /tmp) should fail here, not make a new tree */
+    if (mkdir(argv[2], 0755) != 0 && errno != EEXIST)
+    {
+        fprintf(stderr, "%s: can't make the output folder: %s\n", argv[2], strerror(errno));
+        return 1;
+    }
     snprintf(path, sizeof(path), "%s/sounds.txt", argv[2]);
     list = fopen(path, "w");
     if (list == NULL)
     {
-        fprintf(stderr, "%s: can't write\n", path);
+        fprintf(stderr, "%s: can't write: %s\n", path, strerror(errno));
         return 1;
     }
 
