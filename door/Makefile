@@ -81,7 +81,7 @@ $(GAME)/pix_hooks.o: pix_hooks.c $(WOLF4SDL)/.patched | $(GAME)
 # Renders the game's sound for the JPEG XL mode (tools/wolfrender.c, then tools/make_sound.py). Development only: the
 # results are in sound/, so the BBS never builds this.
 wolfrender: tools/wolfrender.c $(NUKED)/opl3.c
-	$(CC) -O2 -Wall -I $(NUKED) $^ -o $@
+	$(CC) -O2 -Wall -I $(NUKED) $^ -o $@ -lm
 
 # Wolf4SDL's main() runs on the game thread (the module's wolftrace.c), under another name
 $(GAME)/wl_main.o: $(WOLF4SDL)/wl_main.c | $(GAME)

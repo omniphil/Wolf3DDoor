@@ -71,7 +71,7 @@ The game's own sound code runs as in ANSI mode, and its calls are caught on the 
 isn't in the public source):
 
 ```
-make wolfrender && ./wolfrender ../data /tmp/wolfsound && python3 tools/make_sound.py /tmp/wolfsound sound
+make wolfrender && mkdir -p /tmp/wolfsound && ./wolfrender ../data /tmp/wolfsound && python3 tools/make_sound.py /tmp/wolfsound sound
 ```
 
 `wolfrender` drives the Nuked OPL3 chip the way the game does (music at 700 Hz, effects every fifth tick). The
